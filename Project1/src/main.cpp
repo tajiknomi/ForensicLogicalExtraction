@@ -9,6 +9,7 @@ void showMenu() {
     std::cout << "3. Extract Call Logs\n";
     std::cout << "4. Pull Media (DCIM)\n";
     std::cout << "5. Extract MediaStore DB (JSON)\n";
+    std::cout << "6. Extract Device Info\n";
     std::cout << "0. Exit\n";
     std::cout << "Select option: ";
 }
@@ -44,6 +45,9 @@ int main() {
             extractor.extractMediaStoreDb("mediastore.json");
             break;
 
+        case 6:
+            extractor.extractDeviceInfo("device_info.json");
+            break;
 
         case 0:
             std::cout << "Exiting...\n";

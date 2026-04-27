@@ -6,6 +6,14 @@
 #include "json.h"
 using json = nlohmann::json;
 
+enum class DataType {
+    SMS,
+    CALL,
+    MEDIA,
+    CONTACTS,
+    WHATSAPP
+};
+
 class ForensicExtractor {
 
 public:
@@ -16,12 +24,20 @@ public:
     void extractCallLogs(const std::string& outputFile);
     void pullMedia(const std::string& localPath);
     void extractMediaStoreDb(const std::string& outputFile);
+    void extractDeviceInfo(const std::string& outputFile);
     
 private:
     std::map<std::string, std::string> parseRow(const std::string& line);
     void saveToFile(const std::string& data, const std::string& filePath);
     json parseADBOutputToJSON(const std::string& output, const std::string& rowPrefix = "Row:");
     void saveJSONToFile(const json& data, const std::string& outputFile);
+    json parseArtifact(const std::string& output, DataType type);
+    json parseSMS(const std::string& output);
+    json parseCallLogs(const std::string& output);
+    json parseMedia(const std::string& output);
+    std::vector<std::map<std::string, std::string>> extractRows(const std::string& output);
+    std::string trim(const std::string& str);
+
 
 private:
     ADB& adb;
