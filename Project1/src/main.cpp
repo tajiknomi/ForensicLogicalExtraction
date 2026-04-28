@@ -2,21 +2,30 @@
 #include "adb.h"
 #include "extractor.h"
 
-void showMenu() {
+void showMenu(void) {
     std::cout << "\n==== Android Forensic Tool (Windows) ====\n";
     std::cout << "1. List Devices\n";
-    std::cout << "2. Extract SMS\n";
-    std::cout << "3. Extract Call Logs\n";
-    std::cout << "4. Pull Media (DCIM)\n";
-    std::cout << "5. Extract MediaStore DB (JSON)\n";
-    std::cout << "6. Extract Device Info\n";
+    std::cout << "2. Extract Device Info\n";
+    std::cout << "3. Extract Installed Apps list\n";
+    std::cout << "4. Extract MediaStore DB (JSON)\n";
+    std::cout << "5. Extract Call Logs\n";
+    std::cout << "6. Extract SMS\n";
+    std::cout << "7. Pull Media (DCIM)\n";
     std::cout << "0. Exit\n";
     std::cout << "Select option: ";
+}
+
+void showAndroidAdbSetup(void) {
+    std::cout << "\nEnable USB Debugging:\n"
+        << "Settings > About Phone > Tap 'Build Number' 7 times\n"
+        << "Then go to Developer Options and enable USB Debugging.\n" << std::endl;
 }
 
 int main() {
     ADB adb("adb"); // or full path: "C:\\platform-tools\\adb.exe"
     ForensicExtractor extractor(adb);
+
+    showAndroidAdbSetup();
 
     int choice;
 
@@ -30,23 +39,26 @@ int main() {
             break;
 
         case 2:
-            extractor.extractSMS("sms.txt");
+            extractor.extractDeviceInfo("device_info.json");  
             break;
-
+        
         case 3:
-            extractor.extractCallLogs("calllogs.txt");
+            extractor.extractUserInstalledAppsList("UserInstalledAppsList.json");
             break;
-
         case 4:
-            extractor.pullMedia("media");
+            extractor.extractMediaStoreDb("mediastore.json");    
             break;
 
         case 5:
-            extractor.extractMediaStoreDb("mediastore.json");
+            extractor.extractCallLogs("calllogs.txt");
             break;
 
         case 6:
-            extractor.extractDeviceInfo("device_info.json");
+            extractor.extractSMS("sms.txt");
+            break;
+
+        case 7:
+            extractor.pullMedia("media");
             break;
 
         case 0:
@@ -57,4 +69,6 @@ int main() {
             std::cout << "Invalid option.\n";
         }
     }
+
+    return 0;
 }

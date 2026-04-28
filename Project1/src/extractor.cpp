@@ -8,17 +8,17 @@ ForensicExtractor::ForensicExtractor(ADB& adbRef) : adb(adbRef) {}
 
 
 
-void ForensicExtractor::saveToFile(const std::string& data, const std::string& filePath) {
-    std::ofstream file(filePath, std::ios::out);
-
-    if (!file.is_open()) {
-        std::cerr << "[-] Failed to open file: " << filePath << std::endl;
-        return;
-    }
-
-    file << data;
-    file.close();
-}
+//void ForensicExtractor::saveToFile(const std::string& data, const std::string& filePath) {
+//    std::ofstream file(filePath, std::ios::out);
+//
+//    if (!file.is_open()) {
+//        std::cerr << "[-] Failed to open file: " << filePath << std::endl;
+//        return;
+//    }
+//
+//    file << data;
+//    file.close();
+//}
 
 std::string ForensicExtractor::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\n\r");
@@ -125,6 +125,9 @@ json ForensicExtractor::parseArtifact(const std::string& output, DataType type) 
     case DataType::CALL:
         return parseCallLogs(output);
 
+    case DataType::USER_INSTALLED_APPS:
+        return parseInstalledApps(output);
+
     case DataType::MEDIA:
         return parseMedia(output);
 
@@ -149,6 +152,8 @@ std::vector<std::map<std::string, std::string>> ForensicExtractor::extractRows(c
 
     return rows;
 }
+
+
 
 json ForensicExtractor::parseSMS(const std::string& output) {
     auto rows = extractRows(output);
@@ -222,7 +227,34 @@ json ForensicExtractor::parseMedia(const std::string& output) {
     return result;
 }
 
+json ForensicExtractor::parseInstalledApps(const std::string& output) {
 
+    json result = json::array();
+    std::istringstream stream(output);
+    std::string line;
+
+    while (std::getline(stream, line))
+    {
+        // skip empty lines
+        if (line.empty())
+            continue;
+
+        // expected format: package:com.example.app
+        const std::string prefix = "package:";
+        if (line.find(prefix) == 0)
+        {
+            std::string packageName = line.substr(prefix.length());
+
+            json obj;
+            obj["type"] = "package";
+            obj["package_name"] = packageName;
+
+            result.push_back(obj);
+        }
+    }
+
+    return result;
+}
 
 
 
@@ -234,13 +266,11 @@ void ForensicExtractor::listDevices() {
 }
 
 void ForensicExtractor::extractDeviceInfo(const std::string& outputFile) {
+    
     std::cout << "[*] Extracting device information...\n";
-
     std::string output = adb.exec("shell getprop");
-
     std::istringstream stream(output);
     std::string line;
-
     json deviceInfo;
 
     while (std::getline(stream, line)) {
@@ -262,8 +292,14 @@ void ForensicExtractor::extractDeviceInfo(const std::string& outputFile) {
     }
 
     saveJSONToFile(deviceInfo, outputFile);
-
     std::cout << "[+] Device info saved to " << outputFile << std::endl;
+}
+
+void ForensicExtractor::extractUserInstalledAppsList(const std::string& outputFile) {
+
+    std::string output = adb.exec("shell pm list packages -3");
+    json data = parseArtifact(output, DataType::USER_INSTALLED_APPS);
+    saveJSONToFile(data, outputFile);
 }
 
 void ForensicExtractor::extractSMS(const std::string& outputFile) {
