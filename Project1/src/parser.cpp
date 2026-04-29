@@ -99,35 +99,6 @@ nlohmann::json PARSER::parseADBOutputToJSON(const std::string& output, const std
     return jsonArray;
 }
 
-void PARSER::saveJSONToFile(const nlohmann::json& data, const std::string& outputFile) {
-    std::ofstream file(outputFile);
-    if (!file.is_open()) {
-        std::cerr << "[-] Failed to open file: " << outputFile << std::endl;
-        return;
-    }
-    file << data.dump(4); // pretty print
-    file.close();
-}
-
-nlohmann::json PARSER::parseArtifact(const std::string& output, DataType type) {
-    switch (type) {
-    case DataType::SMS:
-        return parseSMS(output);
-
-    case DataType::CALL:
-        return parseCallLogs(output);
-
-    case DataType::USER_INSTALLED_APPS:
-        return parseInstalledApps(output);
-
-    case DataType::MEDIA:
-        return parseMedia(output);
-
-    default:
-        return nlohmann::json::array();
-    }
-}
-
 std::vector<std::map<std::string, std::string>> PARSER::extractRows(const std::string& output) {
     std::istringstream stream(output);
     std::string line;
@@ -144,8 +115,6 @@ std::vector<std::map<std::string, std::string>> PARSER::extractRows(const std::s
 
     return rows;
 }
-
-
 
 nlohmann::json PARSER::parseSMS(const std::string& output) {
     auto rows = extractRows(output);
@@ -249,3 +218,31 @@ nlohmann::json PARSER::parseInstalledApps(const std::string& output) {
 }
 
 
+void PARSER::saveJSONToFile(const nlohmann::json& data, const std::string& outputFile) {
+    std::ofstream file(outputFile);
+    if (!file.is_open()) {
+        std::cerr << "[-] Failed to open file: " << outputFile << std::endl;
+        return;
+    }
+    file << data.dump(4); // pretty print
+    file.close();
+}
+
+nlohmann::json PARSER::parseArtifact(const std::string& output, DataType type) {
+    switch (type) {
+    case DataType::SMS:
+        return parseSMS(output);
+
+    case DataType::CALL:
+        return parseCallLogs(output);
+
+    case DataType::USER_INSTALLED_APPS:
+        return parseInstalledApps(output);
+
+    case DataType::MEDIA:
+        return parseMedia(output);
+
+    default:
+        return nlohmann::json::array();
+    }
+}

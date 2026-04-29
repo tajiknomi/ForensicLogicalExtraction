@@ -17,7 +17,7 @@ std::string ADB::exec(const std::string& command) {
         throw std::runtime_error("Failed to execute ADB command");
     }
 
-    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
         result += buffer.data();
     }
 
