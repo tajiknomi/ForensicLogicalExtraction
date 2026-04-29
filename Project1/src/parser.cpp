@@ -4,6 +4,8 @@
 #include <sstream>
 
 
+// ===================================== PRIVATE =====================================
+
 //void ForensicExtractor::saveToFile(const std::string& data, const std::string& filePath) {
 //    std::ofstream file(filePath, std::ios::out);
 //
@@ -217,6 +219,31 @@ nlohmann::json PARSER::parseInstalledApps(const std::string& output) {
     return result;
 }
 
+
+// ===================================== PUBLIC =====================================
+
+nlohmann::json PARSER::parseAdbDeviceInfo(const std::string& deviceInfoFromAdb) {
+
+    std::istringstream stream(deviceInfoFromAdb);
+    std::string line;
+    nlohmann::json deviceInfo;
+
+    while (std::getline(stream, line)) {
+        // Expected format: [key]: [value]
+        size_t keyStart = line.find('[');
+        size_t keyEnd = line.find(']');
+        size_t valueStart = line.find('[', keyEnd);
+        size_t valueEnd = line.find(']', valueStart);
+        if (keyStart == std::string::npos || keyEnd == std::string::npos ||
+            valueStart == std::string::npos || valueEnd == std::string::npos) {
+            continue;
+        }
+        std::string key = line.substr(keyStart + 1, keyEnd - keyStart - 1);
+        std::string value = line.substr(valueStart + 1, valueEnd - valueStart - 1);
+        deviceInfo[key] = value;
+    }
+    return deviceInfo;
+}
 
 void PARSER::saveJSONToFile(const nlohmann::json& data, const std::string& outputFile) {
     std::ofstream file(outputFile);

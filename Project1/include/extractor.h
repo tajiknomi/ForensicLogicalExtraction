@@ -3,6 +3,7 @@
 #include "adb.h"
 #include <string>
 #include <vector>
+#include <filesystem>
 
 class ForensicExtractor {
 
@@ -10,15 +11,17 @@ public:
     ForensicExtractor(ADB& adb);
 
     int listDevices();
-    void extractSMS(const std::string& outputFile);
-    void extractCallLogs(const std::string& outputFile);
-    void pullMedia(const std::string& localPath);
-    void extractMediaStoreDb(const std::string& outputFile);
-    void extractDeviceInfo(const std::string& outputFile);
-    void extractUserInstalledAppsList(const std::string& outputFile);
+    int extractSMS(const std::string& outputFileName);
+    int extractCallLogs(const std::string& outputFileName);
+    int pullMedia(const std::string& dirName);
+    int extractMediaStoreDb(const std::string& outputFileName);
+    int extractDeviceInfo(const std::string& outputFileName);
+    int extractUserInstalledAppsList(const std::string& outputFileName);
 
 private:
     std::vector<std::tuple<std::string, std::string>> getFilePathsFromJson(const std::string& jsonFilePath);
+    std::filesystem::path createDirForConnectedDevice(const std::string& input);
+
 private:
     ADB& adb;
 };

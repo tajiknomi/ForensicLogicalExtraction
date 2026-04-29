@@ -28,6 +28,7 @@ private:
     static std::string trim(const std::string& str);
 
 public:
+    static nlohmann::json parseAdbDeviceInfo(const std::string& deviceInfoFromAdb);
     static void saveJSONToFile(const nlohmann::json& data, const std::string& outputFile);
     static nlohmann::json parseArtifact(const std::string& output, DataType type);
 };
