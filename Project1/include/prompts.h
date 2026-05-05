@@ -1,6 +1,6 @@
 void showMenu(void) {
     std::cout << "\n==== Android Forensic Tool (Windows) ====\n";
-    std::cout << "1. List Devices\n";
+    std::cout << "1. Show Connected Devices\n";
     std::cout << "2. Extract Device Info\n";
     std::cout << "3. Extract Installed Apps list\n";
     std::cout << "4. Extract MediaStore DB (JSON)\n";

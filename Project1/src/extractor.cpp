@@ -3,7 +3,7 @@
 #include <sstream>
 #include "extractor.h"
 #include "parser.h"
-
+#include "stringUtil.h"
 
 ForensicExtractor::ForensicExtractor(ADB& adbRef) : adb(adbRef) {}
 
@@ -33,16 +33,15 @@ std::vector<std::tuple<std::string, std::string>> ForensicExtractor::getFilePath
             filePaths.push_back({ filePath, mime_type });
         }
     }
-
     return filePaths;
 }
 
-std::filesystem::path ForensicExtractor::createDirForConnectedDevice(const std::string& input) {
-    std::string deviceSerial;
-    std::stringstream stream(input);
+std::filesystem::path ForensicExtractor::createDirForConnectedDevice(const std::wstring& input) {
+    std::wstring deviceSerial;
+    std::wstringstream stream(input);
     std::getline(stream, deviceSerial);
     std::getline(stream, deviceSerial);
-    std::stringstream(deviceSerial) >> deviceSerial;
+    std::wstringstream(deviceSerial) >> deviceSerial;
     std::error_code ec;
     std::filesystem::path pathToDir = std::filesystem::current_path() / deviceSerial;
     if (std::filesystem::exists(pathToDir)) {
@@ -63,102 +62,119 @@ std::filesystem::path ForensicExtractor::createDirForConnectedDevice(const std::
 
 // ===================================== PUBLIC =====================================
 
-int ForensicExtractor::listDevices() {
+int ForensicExtractor::numOfConnectedAdbDevices() {
+    
+    std::string output = StringUtils::convertWStringToUTF8(adb.exec(L"devices"));
+    int deviceCount{ -2 };
+    for (char c : output) {
+        if (c == '\n') {
+            deviceCount++;
+        }
+    }
+    return deviceCount;
+}
 
-    std::string output = adb.exec("devices");
-    int deviceCount = -2;
+void ForensicExtractor::showConnectedDevices() {
+
+    int deviceCount{-2};
+    std::string output = StringUtils::convertWStringToUTF8(adb.exec(L"devices"));
     for (char c : output) {
         if (c == '\n') {
             deviceCount++;
         }
     }
     if (deviceCount == 0) {
-        std::cerr << "No device is connected yet" << std::endl;
+        std::cerr << "No device is connected !" << std::endl;
     }
     else {
         std::cout << "\nConnected Devices: " << deviceCount << std::endl << output << std::endl;
     }
-    return deviceCount;
 }
 
-int ForensicExtractor::extractDeviceInfo(const std::string& outputFileName) {
+int ForensicExtractor::extractDeviceInfo(const std::wstring& outputFileName) {
 
-    if (this->listDevices() == 0) {
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
         return -1;
     }
     std::filesystem::path pathToDir;
-    if ((pathToDir = this->createDirForConnectedDevice(adb.exec("devices"))).empty()) {
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
         return -1;
     }
-    const std::filesystem::path pathToOutputFile{ pathToDir.string() + "\\" + outputFileName };
+    const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
     std::cout << "[*] Extracting device information...\n";
-    std::string output = adb.exec("shell getprop");
-    nlohmann::json deviceInfo = PARSER::parseAdbDeviceInfo(output);
+    std::wstring output = adb.exec(L"shell getprop");
+    nlohmann::json deviceInfo = PARSER::parseAdbDeviceInfo(StringUtils::convertWStringToUTF8(output));
     PARSER::saveJSONToFile(deviceInfo, pathToOutputFile.string());
     std::cout << "[+] Device info saved to " << pathToOutputFile << std::endl;
     return 0;
 }
 
-int ForensicExtractor::extractUserInstalledAppsList(const std::string& outputFileName) {
+int ForensicExtractor::extractUserInstalledAppsList(const std::wstring& outputFileName) {
 
-    if (this->listDevices() == 0) {
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
         return -1;
     }
     std::filesystem::path pathToDir;
-    if ((pathToDir = this->createDirForConnectedDevice(adb.exec("devices"))).empty()) {
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
         return -1;
     }
-    const std::filesystem::path pathToOutputFile{ pathToDir.string() + "\\" + outputFileName };
+    const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
     std::cout << "[*] Extracting user Installed App list...\n";
-    std::string output = adb.exec("shell pm list packages -3");
-    nlohmann::json data = PARSER::parseArtifact(output, DataType::USER_INSTALLED_APPS);
+    std::wstring output = adb.exec(L"shell pm list packages -3");
+    nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::USER_INSTALLED_APPS);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
     std::cout << "[+] User-Installed App list saved to " << pathToOutputFile << std::endl;
     return 0;
 }
 
-int ForensicExtractor::extractSMS(const std::string& outputFileName) {
+int ForensicExtractor::extractSMS(const std::wstring& outputFileName) {
 
-    if (this->listDevices() == 0) {
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
         return -1;
     }
     std::filesystem::path pathToDir;
-    if ((pathToDir = this->createDirForConnectedDevice(adb.exec("devices"))).empty()) {
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
         return -1;
     }
-    const std::filesystem::path pathToOutputFile{ pathToDir.string() + "\\" + outputFileName };
+    const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
     std::cout << "[*] Extracting SMS...\n";
-    std::string output = adb.exec("shell content query --uri content://sms");
-    nlohmann::json data = PARSER::parseArtifact(output, DataType::SMS);
+    std::wstring output = adb.exec(L"shell content query --uri content://sms");
+    nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::SMS);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
-    std::cout << "[+] Device SMS saved to " << outputFileName << std::endl;
+    std::wcout << "[+] Device SMS saved to " << outputFileName << std::endl;
     return 0;
 }
 
-int ForensicExtractor::extractCallLogs(const std::string& outputFileName) {
-    if (this->listDevices() == 0) {
+int ForensicExtractor::extractCallLogs(const std::wstring& outputFileName) {
+    
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
         return -1;
     }
     std::filesystem::path pathToDir;
-    if ((pathToDir = this->createDirForConnectedDevice(adb.exec("devices"))).empty()) {
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
         return -1;
     }
-    const std::filesystem::path pathToOutputFile{ pathToDir.string() + "\\" + outputFileName };
+    const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
     std::cout << "[*] Extracting Call Logs...\n";
-    std::string output = adb.exec("shell content query --uri content://call_log/calls");
-    nlohmann::json data = PARSER::parseArtifact(output, DataType::CALL);
+    std::wstring output = adb.exec(L"shell content query --uri content://call_log/calls");
+    nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::CALL);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
     std::cout << "[+] Call logs saved to " << pathToOutputFile << std::endl;
     return 0;
 }
 
-int ForensicExtractor::pullMedia(const std::string& dirName) {
+int ForensicExtractor::pullMedia(const std::wstring& dirName) {
 
-    if (this->listDevices() == 0) {
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
         return -1;
     }
     std::filesystem::path pathToDir;
-    if ((pathToDir = this->createDirForConnectedDevice(adb.exec("devices"))).empty()) {
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
         return -1;
     }
 
@@ -166,7 +182,7 @@ int ForensicExtractor::pullMedia(const std::string& dirName) {
     if (!std::filesystem::exists(mediastorePath)) {
         // Extract mediaStore index file and save it in json format
         std::cout << "[*] Extracting MediaStore...\n";
-        this->extractMediaStoreDb("mediastore.json");
+        this->extractMediaStoreDb(L"mediastore.json");
     }
     const std::filesystem::path pathToOutputDir = pathToDir / dirName;
 
@@ -174,12 +190,12 @@ int ForensicExtractor::pullMedia(const std::string& dirName) {
     if (!std::filesystem::exists(mediastorePath)) {
         // Extract mediaStore index file and save it in json format
         std::cout << "[*] Extracting MediaStore...\n";
-        this->extractMediaStoreDb("mediastore.json");
+        this->extractMediaStoreDb(L"mediastore.json");
     }
 
     std::cout << "[*] Reading MediaStore JSON file...\n";
     // Read and parse the mediastore.json file to get the file paths and MIME types
-    std::vector<std::tuple<std::string, std::string>> filePaths = getFilePathsFromJson(mediastorePath.string());
+    std::vector<std::tuple<std::string, std::string>> filePaths = getFilePathsFromJson(StringUtils::convertWStringToUTF8(mediastorePath));
     if (filePaths.empty()) {
         std::cout << "[!] No files found in MediaStore JSON.\n";
         return -1;
@@ -188,71 +204,70 @@ int ForensicExtractor::pullMedia(const std::string& dirName) {
     // Pull the indexed files from MediaStore, organizing by MIME type
     for (const auto& [filePath, mimeType] : filePaths) {
         // Create directory for MIME type if it doesn't exist
-        std::string mimeDir = pathToOutputDir.string() + "/" + mimeType;
+        std::string mimeDir = pathToOutputDir.u8string() + "\\" + mimeType;
         if (!std::filesystem::exists(mimeDir)) {
-            std::cout << "[*] Creating directory: " << mimeDir << "\n";
+            std::cout << L"[*] Creating directory: " << mimeDir << L"\n";
             std::filesystem::create_directories(mimeDir);  // Create the directory for the MIME type
         }
 
         // Construct the full destination file path
         std::string fileName = filePath.substr(filePath.find_last_of("/\\") + 1);  // Extract filename
-        std::string destFilePath = mimeDir + "/" + fileName;
-
-        std::cout << "[*] Pulling file: " << filePath << " to " << destFilePath << "\n";
+        std::string destFilePath = mimeDir + "\\" + fileName;
+        std::cout << L"[*] Pulling file: " << filePath << " to " << destFilePath << "\n";
         std::string pullCommand = "pull \"" + filePath + "\" \"" + destFilePath + "\"";
-
-        std::string result = adb.exec(pullCommand);
-        std::cout << result << std::endl;
+        std::wstring result = adb.exec(StringUtils::convertUTF8ToWString(pullCommand));
+        std::wcout << result << std::endl;
     }
     std::cout << "[+] All MediaStore indexed files pulled.\n";
 
 
     // Pull directories that are typically missed by MediaStore
-    std::vector<std::string> directoriesToPull = {
-        "/storage/emulated/0/Android/media/",
-        "/storage/emulated/0/Android/data/",
-        "/storage/emulated/0/Android/obb/",
-        "/storage/emulated/0/WhatsApp/Media/",
-        "/storage/emulated/0/Telegram/",
-        "/storage/emulated/0/Instagram/",
-        "/storage/emulated/0/.thumbnails/",
-        "/storage/emulated/0/.Statuses/",
-        "/storage/emulated/0/.nomedia/",
-        "/storage/emulated/0/.android_secure/",
-        "/storage/emulated/0/Google Drive/",
-        "/storage/emulated/0/Dropbox/",
-        "/storage/emulated/0/OneDrive/",
-        "/storage/emulated/0/TWRP/",
-        "/storage/emulated/0/clockworkmod/"
+    std::vector<std::wstring> directoriesToPull = {
+        L"/storage/emulated/0/Android/media/",
+        L"/storage/emulated/0/Android/data/",
+        L"/storage/emulated/0/Android/obb/",
+        L"/storage/emulated/0/WhatsApp/Media/",
+        L"/storage/emulated/0/Telegram/",
+        L"/storage/emulated/0/Instagram/",
+        L"/storage/emulated/0/.thumbnails/",
+        L"/storage/emulated/0/.Statuses/",
+        L"/storage/emulated/0/.nomedia/",
+        L"/storage/emulated/0/.android_secure/",
+        L"/storage/emulated/0/Google Drive/",
+        L"/storage/emulated/0/Dropbox/",
+        L"/storage/emulated/0/OneDrive/",
+        L"/storage/emulated/0/TWRP/",
+        L"/storage/emulated/0/clockworkmod/"
     };
 
     // Pull these directories and organize them by MIME type (if possible)
     for (const auto& dir : directoriesToPull) {
-        std::cout << "[*] Pulling directory: " << dir << "\n";
-        std::string dirPullCommand = "pull \"" + dir + "\" \"" + pathToOutputDir.string() + "\"";
-        std::string result = adb.exec(dirPullCommand);
-        std::cout << result << std::endl;
+        std::wcout << "[*] Pulling directory: " << dir << "\n";
+        std::wstring dirPullCommand = L"pull \"" + dir + L"\" \"" + pathToOutputDir.wstring() + L"\"";
+        std::wstring result = adb.exec(dirPullCommand);
+        std::wcout << result << std::endl;
     }
 
     std::cout << "[+] All directories pulled successfully.\n";
     return 0;
 }
 
-int ForensicExtractor::extractMediaStoreDb(const std::string& outputFileName) {
+int ForensicExtractor::extractMediaStoreDb(const std::wstring& outputFileName) {
 
-    if (this->listDevices() == 0) {
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
         return -1;
     }
     std::filesystem::path pathToDir;
-    if ((pathToDir = this->createDirForConnectedDevice(adb.exec("devices"))).empty()) {
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
         return -1;
     }
-    const std::filesystem::path pathToOutputFile{ pathToDir.string() + "\\" + outputFileName };
+    const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
     std::cout << "[*] Extracting MediaStore...\n";
-    std::string output = adb.exec(
-        "shell content query --uri content://media/external/file"
+    std::wstring output = adb.exec(
+        L"shell content query --uri content://media/external/file"
     );
-    nlohmann::json data = PARSER::parseArtifact(output, DataType::MEDIA);
+    nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::MEDIA);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
     std::cout << "[+] MediaStore DB saved to " << pathToOutputFile << std::endl;
     return 0;

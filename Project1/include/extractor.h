@@ -9,18 +9,20 @@ class ForensicExtractor {
 
 private:
     std::vector<std::tuple<std::string, std::string>> getFilePathsFromJson(const std::string& jsonFilePath);
-    std::filesystem::path createDirForConnectedDevice(const std::string& input);
+    std::filesystem::path createDirForConnectedDevice(const std::wstring& input);
 
 private:
     ADB& adb;
 
 public:
     ForensicExtractor(ADB& adb);
-    int listDevices();
-    int extractSMS(const std::string& outputFileName);
-    int extractCallLogs(const std::string& outputFileName);
-    int pullMedia(const std::string& dirName);
-    int extractMediaStoreDb(const std::string& outputFileName);
-    int extractDeviceInfo(const std::string& outputFileName);
-    int extractUserInstalledAppsList(const std::string& outputFileName);
+    int numOfConnectedAdbDevices(void);
+    void showConnectedDevices(void);
+    int extractDeviceInfo(const std::wstring& outputFileName);
+    int extractUserInstalledAppsList(const std::wstring& outputFileName);
+    int extractSMS(const std::wstring& outputFileName);
+    int extractCallLogs(const std::wstring& outputFileName);
+    int pullMedia(const std::wstring& dirName);
+    int extractMediaStoreDb(const std::wstring& outputFileName);
+    
 };
