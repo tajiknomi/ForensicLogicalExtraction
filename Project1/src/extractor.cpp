@@ -60,6 +60,34 @@ std::filesystem::path ForensicExtractor::createDirForConnectedDevice(const std::
     return pathToDir;
 }
 
+int ForensicExtractor::collectCalendarRawDataViaAdb(std::wstring& calendarRawData,
+    std::wstring& eventsRawData,
+    std::wstring& calendarWhenRawData,
+    std::wstring& attendeesRawData,
+    std::wstring& remindersRawData,
+    std::wstring& extendedPropertiesRawData) {
+
+    calendarRawData = adb.exec(
+        L"shell content query --uri content://com.android.calendar/calendars"
+    );
+    eventsRawData = adb.exec(
+        L"shell content query --uri content://com.android.calendar/events"
+    );
+    calendarWhenRawData = adb.exec(
+        L"shell content query --uri content://com.android.calendar/instances/when/0/9999999999999"
+    );
+    attendeesRawData = adb.exec(
+        L"shell content query --uri content://com.android.calendar/attendees"
+    );
+    remindersRawData = adb.exec(
+        L"shell content query --uri content://com.android.calendar/reminders"
+    );
+    extendedPropertiesRawData = adb.exec(
+        L"shell content query --uri content://com.android.calendar/extendedproperties"
+    );
+    return 0;
+}
+
 // ===================================== PUBLIC =====================================
 
 int ForensicExtractor::numOfConnectedAdbDevices() {
@@ -270,5 +298,48 @@ int ForensicExtractor::extractMediaStoreDb(const std::wstring& outputFileName) {
     nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::MEDIA);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
     std::cout << "[+] MediaStore DB saved to " << pathToOutputFile << std::endl;
+    return 0;
+}
+
+int ForensicExtractor::extractCalendarEntities(const std::wstring& outputFileName) {
+
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
+        return -1;
+    }
+    std::filesystem::path pathToDir;
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
+        return -1;
+    }
+    std::wstring calendarRawData, eventsRawData, calendarWhenRawData, attendeesRawData, remindersRawData, extendedPropertiesRawData;
+    int errorCheck = collectCalendarRawDataViaAdb(calendarRawData, 
+                                            eventsRawData, 
+                                            calendarWhenRawData, 
+                                            attendeesRawData, 
+                                            remindersRawData, 
+                                            extendedPropertiesRawData);
+ 
+    nlohmann::json calendars_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(calendarRawData), DataType::CALENDAR);
+    nlohmann::json events_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(eventsRawData), DataType::EVENTS);
+    nlohmann::json calendarWhen_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(calendarWhenRawData), DataType::WHEN);
+    nlohmann::json attendees_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(attendeesRawData), DataType::ATTENDEES);
+    nlohmann::json reminders_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(remindersRawData), DataType::REMINDERS);
+    nlohmann::json extendedproperties_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(extendedPropertiesRawData), DataType::EXTENDED_PROPERTIES);
+
+
+    nlohmann::json mergedArtifact_json = PARSER::mergeCalendarArtifacts(calendars_json, events_json, calendarWhen_json, attendees_json, reminders_json, extendedproperties_json);
+    nlohmann::json calendarReport = PARSER::flattenForensicCalendar(mergedArtifact_json);
+    
+    PARSER::saveJSONToFile(calendars_json, "calander.json");
+    PARSER::saveJSONToFile(events_json, "events.json");
+    PARSER::saveJSONToFile(calendarWhen_json, "when.json");
+    PARSER::saveJSONToFile(attendees_json, "attendees.json");
+    PARSER::saveJSONToFile(reminders_json, "reminders.json");
+    PARSER::saveJSONToFile(extendedproperties_json, "extendedProperties.json");
+    PARSER::saveJSONToFile(mergedArtifact_json, "mergedArtifact.json");
+    PARSER::saveJSONToFile(calendarReport, "calendarReport.json");
+
+    //std::cout << "[+] Calendar Entities saved to " << pathToOutputFile << std::endl;
+    //std::cout << calendars_json << std::endl;
     return 0;
 }

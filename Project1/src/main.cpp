@@ -41,6 +41,9 @@ int main() {
         case 7:
             extractor.pullMedia(L"media"); break;          
 
+        case 8:
+            extractor.extractCalendarEntities(L"calendarEntities.json"); break;
+
         case 0:
             std::cout << "Exiting...\n"; return 0;
             

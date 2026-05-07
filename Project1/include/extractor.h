@@ -24,5 +24,12 @@ public:
     int extractCallLogs(const std::wstring& outputFileName);
     int pullMedia(const std::wstring& dirName);
     int extractMediaStoreDb(const std::wstring& outputFileName);
+    int extractCalendarEntities(const std::wstring& outputFileName);
+    int collectCalendarRawDataViaAdb(std::wstring& calendarRawData, 
+                                     std::wstring& eventsRawData, 
+                                     std::wstring& calendarWhenRawData, 
+                                     std::wstring& attendeesRawData, 
+                                     std::wstring& remindersRawData,
+                                     std::wstring& extendedPropertiesRawData);
     
 };
