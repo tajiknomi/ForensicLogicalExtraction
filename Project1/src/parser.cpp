@@ -149,7 +149,10 @@ nlohmann::json PARSER::parseSMS(const std::string& artifactRawData) {
         obj["type"] = "sms";
         obj["address"] = row.count("address") ? row.at("address") : "";
         obj["message"] = row.count("body") ? row.at("body") : "";
-        obj["timestamp"] = row.count("date") ? row.at("date") : "";
+        //obj["timestamp"] = row.count("date") ? row.at("date") : "";   // This store unix timestamp
+        obj["timestamp"] = row.count("date")                            // Convert unix to human readable timestamp
+            ? PARSER::formatEpochMillis(row.at("date"))
+            : "";
 
         // SMS type mapping
         if (row.count("type")) {
@@ -173,7 +176,10 @@ nlohmann::json PARSER::parseCallLogs(const std::string& artifactRawData) {
         obj["type"] = "call";
         obj["number"] = row.count("number") ? row.at("number") : "";
         obj["duration"] = row.count("duration") ? row.at("duration") : "";
-        obj["timestamp"] = row.count("date") ? row.at("date") : "";
+       // obj["timestamp"] = row.count("date") ? row.at("date") : "";   // This store unix timestamp
+        obj["timestamp"] = row.count("date")                            // Convert unix to human readable timestamp
+            ? PARSER::formatEpochMillis(row.at("date"))
+            : "";
 
         // Call type mapping
         if (row.count("type")) {
