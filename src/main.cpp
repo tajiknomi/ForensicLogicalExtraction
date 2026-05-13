@@ -44,6 +44,9 @@ int main() {
         case 8:
             extractor.extractCalendarEntities(L"calendarEntities.json"); break;
 
+        case 9:
+            extractor.extractContacts(L"contacts.json"); break;
+        
         case 0:
             std::cout << "Exiting...\n"; return 0;
             

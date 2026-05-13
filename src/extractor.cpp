@@ -349,3 +349,22 @@ int ForensicExtractor::extractCalendarEntities(const std::wstring& outputFileNam
     //std::cout << calendars_json << std::endl;
     return 0;
 }
+
+int ForensicExtractor::extractContacts(const std::wstring& outputFileName) {
+
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
+        return -1;
+    }
+    std::filesystem::path pathToDir;
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
+        return -1;
+    }
+    const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
+    std::cout << "[*] Extracting Contacts...\n";
+    std::wstring output = adb.exec(L"shell content query --uri content://contacts/phones/");
+    nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::CONTACTS);
+    PARSER::saveJSONToFile(data, pathToOutputFile.string());
+    std::wcout << "[+] Device CONTACTS saved to " << outputFileName << std::endl;
+    return 0;
+}

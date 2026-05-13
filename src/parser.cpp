@@ -195,6 +195,76 @@ nlohmann::json PARSER::parseCallLogs(const std::string& artifactRawData) {
     return result;
 }
 
+nlohmann::json PARSER::parseContacts(const std::string& artifactRawData) {
+    auto rows = extractRows(artifactRawData); // your existing row extractor
+    nlohmann::json result = nlohmann::json::array();
+
+    // Mapping numeric type to string
+    std::unordered_map<std::string, std::string> phoneTypeMap = {
+        {"1", "HOME"},
+        {"2", "MOBILE"},
+        {"3", "WORK"},
+        {"4", "FAX_WORK"},
+        {"5", "FAX_HOME"},
+        {"6", "PAGER"},
+        {"7", "OTHER"},
+        {"8", "CALLBACK"},
+        {"9", "CAR"},
+        {"10", "COMPANY_MAIN"},
+        {"11", "ISDN"},
+        {"12", "MAIN"},
+        {"13", "OTHER_FAX"},
+        {"14", "RADIO"},
+        {"15", "TELEX"},
+        {"16", "TTY_TDD"},
+        {"17", "WORK_MOBILE"},
+        {"18", "WORK_PAGER"},
+        {"19", "ASSISTANT"},
+        {"20", "MMS"}
+    };
+
+    for (const auto& row : rows) {
+        nlohmann::json obj;
+        obj["type"] = "contact";
+
+        // Name: if missing, use empty string
+        obj["name"] = row.count("display_name") && !row.at("display_name").empty()
+            ? row.at("display_name")
+            : "";
+
+        // Phone: if missing, skip the entry for forensic cleanliness
+        if (row.count("number") && !row.at("number").empty()) {
+            obj["phone"] = row.at("number");
+        }
+        else {
+            continue; // skip rows without phone numbers
+        }
+
+        // Map numeric type to string, default to OTHER
+        if (row.count("type") && !row.at("type").empty() && phoneTypeMap.count(row.at("type"))) {
+            obj["phone_type"] = phoneTypeMap[row.at("type")];
+        }
+        else {
+            obj["phone_type"] = "OTHER";
+        }
+
+        // Use contact_id if present, otherwise use person
+        if (row.count("contact_id") && !row.at("contact_id").empty()) {
+            obj["contact_id"] = row.at("contact_id");
+        }
+        else if (row.count("person") && !row.at("person").empty()) {
+            obj["contact_id"] = row.at("person");
+        }
+        else {
+            obj["contact_id"] = ""; // fallback empty
+        }
+
+        result.push_back(obj);
+    }
+
+    return result;
+}
+
 nlohmann::json PARSER::parseMedia(const std::string& artifactRawData) {
     auto rows = extractRows(artifactRawData);
     nlohmann::json result = nlohmann::json::array();
@@ -566,6 +636,9 @@ nlohmann::json PARSER::parseArtifact(const std::string& artifactRawData, DataTyp
 
     case DataType::MEDIA:
         return parseMedia(artifactRawData);
+
+    case DataType::CONTACTS:
+        return parseContacts(artifactRawData);
 
     case DataType::CALENDAR:
         return parseCalendar(artifactRawData);

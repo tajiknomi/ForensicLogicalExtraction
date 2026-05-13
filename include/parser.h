@@ -16,7 +16,7 @@ enum class DataType {
     WHEN,
     ATTENDEES,
     REMINDERS,
-    EXTENDED_PROPERTIES
+    EXTENDED_PROPERTIES,
 };
 
 
@@ -28,6 +28,7 @@ private:
     static nlohmann::json parseADBOutputToJSON(const std::string& output, const std::string& rowPrefix = "Row:");
     static nlohmann::json parseSMS(const std::string& output);
     static nlohmann::json parseCallLogs(const std::string& output);
+    static nlohmann::json parseContacts(const std::string& artifactRawData);
     static nlohmann::json parseMedia(const std::string& output);
     static nlohmann::json parseInstalledApps(const std::string& output);
     static nlohmann::json parseCalendar(const std::string& artifactRawData);

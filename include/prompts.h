@@ -8,6 +8,7 @@ void showMenu(void) {
     std::cout << "6. Extract SMS\n";
     std::cout << "7. Pull Media\n";
     std::cout << "8. Extract Calendar Entities\n";
+    std::cout << "9. Extract Contacts Entities\n";
     std::cout << "0. Exit\n";
     std::cout << "Select option: ";
 }
