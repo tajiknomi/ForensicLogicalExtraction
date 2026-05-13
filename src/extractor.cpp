@@ -4,6 +4,7 @@
 #include "extractor.h"
 #include "parser.h"
 #include "stringUtil.h"
+#include "zipHelper.h"
 
 ForensicExtractor::ForensicExtractor(ADB& adbRef) : adb(adbRef) {}
 
@@ -134,6 +135,7 @@ int ForensicExtractor::extractDeviceInfo(const std::wstring& outputFileName) {
     std::wstring output = adb.exec(L"shell getprop");
     nlohmann::json deviceInfo = PARSER::parseAdbDeviceInfo(StringUtils::convertWStringToUTF8(output));
     PARSER::saveJSONToFile(deviceInfo, pathToOutputFile.string());
+    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/deviceInfo.zip");
     std::cout << "[+] Device info saved to " << pathToOutputFile << std::endl;
     return 0;
 }
@@ -153,6 +155,7 @@ int ForensicExtractor::extractUserInstalledAppsList(const std::wstring& outputFi
     std::wstring output = adb.exec(L"shell pm list packages -3");
     nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::USER_INSTALLED_APPS);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
+    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/installedApps.zip");
     std::cout << "[+] User-Installed App list saved to " << pathToOutputFile << std::endl;
     return 0;
 }
@@ -172,6 +175,7 @@ int ForensicExtractor::extractSMS(const std::wstring& outputFileName) {
     std::wstring output = adb.exec(L"shell content query --uri content://sms");
     nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::SMS);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
+    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string()+"/sms.zip");
     std::wcout << "[+] Device SMS saved to " << outputFileName << std::endl;
     return 0;
 }
@@ -191,6 +195,7 @@ int ForensicExtractor::extractCallLogs(const std::wstring& outputFileName) {
     std::wstring output = adb.exec(L"shell content query --uri content://call_log/calls");
     nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::CALL);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
+    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/callLogs.zip");
     std::cout << "[+] Call logs saved to " << pathToOutputFile << std::endl;
     return 0;
 }
@@ -297,6 +302,7 @@ int ForensicExtractor::extractMediaStoreDb(const std::wstring& outputFileName) {
     );
     nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::MEDIA);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
+    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/MediaStore.zip");
     std::cout << "[+] MediaStore DB saved to " << pathToOutputFile << std::endl;
     return 0;
 }
@@ -339,12 +345,19 @@ int ForensicExtractor::extractCalendarEntities(const std::wstring& outputFileNam
 //    PARSER::saveJSONToFile(reminders_json, "reminders.json");
 //    PARSER::saveJSONToFile(extendedproperties_json, "extendedProperties.json");
 //    PARSER::saveJSONToFile(mergedArtifact_json, "mergedArtifact.json");
-
-    const std::filesystem::path pathToMergedReport{ pathToDir.wstring() + L"\\" + L"calendarEntities_2.json" };
+    std::error_code ec;
+    std::filesystem::path pathToCalendarEntitiesDir = pathToDir / "calendarEntities";
+    std::filesystem::create_directory(pathToCalendarEntitiesDir, ec);
+    if (ec) {
+        std::cout << "error while creating " << pathToCalendarEntitiesDir << std::endl;
+        return -1;
+    }
+    const std::filesystem::path pathToMergedReport{ pathToCalendarEntitiesDir.generic_wstring() + L"\\" + L"calendarEntities_2.json" };
     PARSER::saveJSONToFile(mergedArtifact_json, pathToMergedReport.generic_string());
-    const std::filesystem::path pathToCalendarReport{ pathToDir.wstring() + L"\\" + outputFileName };
+    const std::filesystem::path pathToCalendarReport{ pathToCalendarEntitiesDir.wstring() + L"\\" + outputFileName };
     PARSER::saveJSONToFile(calendarReport, pathToCalendarReport.generic_string());
-
+    std::cout << " ---> " << pathToCalendarEntitiesDir.generic_string() << std::endl;
+    ZipHelper::zipFolderRecursively(pathToCalendarEntitiesDir.generic_string(), pathToDir.generic_string() + "\\" + "calendarEntities.zip");
     std::cout << "[+] Calendar Entities saved to " << pathToCalendarReport << std::endl;
     //std::cout << calendars_json << std::endl;
     return 0;
@@ -365,6 +378,7 @@ int ForensicExtractor::extractContacts(const std::wstring& outputFileName) {
     std::wstring output = adb.exec(L"shell content query --uri content://contacts/phones/");
     nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::CONTACTS);
     PARSER::saveJSONToFile(data, pathToOutputFile.string());
+    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/contacts.zip");
     std::wcout << "[+] Device CONTACTS saved to " << outputFileName << std::endl;
     return 0;
 }
