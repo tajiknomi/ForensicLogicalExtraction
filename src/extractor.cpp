@@ -356,7 +356,6 @@ int ForensicExtractor::extractCalendarEntities(const std::wstring& outputFileNam
     PARSER::saveJSONToFile(mergedArtifact_json, pathToMergedReport.generic_string());
     const std::filesystem::path pathToCalendarReport{ pathToCalendarEntitiesDir.wstring() + L"\\" + outputFileName };
     PARSER::saveJSONToFile(calendarReport, pathToCalendarReport.generic_string());
-    std::cout << " ---> " << pathToCalendarEntitiesDir.generic_string() << std::endl;
     ZipHelper::zipFolderRecursively(pathToCalendarEntitiesDir.generic_string(), pathToDir.generic_string() + "\\" + "calendarEntities.zip");
     std::cout << "[+] Calendar Entities saved to " << pathToCalendarReport << std::endl;
     //std::cout << calendars_json << std::endl;
