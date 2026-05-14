@@ -1,0 +1,18 @@
+﻿  Building Custom Rule C:/Users/illusion/Downloads/zlib-1.3.2/zlib-1.3.2/CMakeLists.txt
+  adler32.c
+  compress.c
+  crc32.c
+  deflate.c
+  gzclose.c
+  gzlib.c
+  gzread.c
+  gzwrite.c
+  inflate.c
+  infback.c
+  inftrees.c
+  inffast.c
+  trees.c
+  uncompr.c
+  zutil.c
+  Generating Code...
+  zlibstatic.vcxproj -> C:\Users\illusion\Downloads\zlib-1.3.2\zlib-1.3.2\build\MinSizeRel\zs.lib
