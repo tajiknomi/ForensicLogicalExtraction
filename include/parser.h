@@ -5,6 +5,7 @@
 
 
 enum class DataType {
+    ADB_RAW,
     SMS,
     CALL,
     MEDIA,
@@ -23,9 +24,10 @@ enum class DataType {
 class PARSER {
 
 private:
+    static nlohmann::json parseADB_RAW(const std::string& artifactRawData);
     //    void saveToFile(const std::string& data, const std::string& filePath);
     static std::map<std::string, std::string> parseRow(const std::string& line);
-    static nlohmann::json parseADBOutputToJSON(const std::string& output, const std::string& rowPrefix = "Row:");
+    //static nlohmann::json parseADBOutputToJSON(const std::string& output, const std::string& rowPrefix = "Row:");
     static nlohmann::json parseSMS(const std::string& output);
     static nlohmann::json parseCallLogs(const std::string& output);
     static nlohmann::json parseContacts(const std::string& artifactRawData);
@@ -52,4 +54,5 @@ public:
         const nlohmann::json& reminders_json,
         const nlohmann::json& extendedproperties_json);
     static nlohmann::json flattenForensicCalendar(const nlohmann::json& mergedCalendars);
+    
 };

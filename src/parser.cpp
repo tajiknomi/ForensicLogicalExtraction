@@ -98,30 +98,30 @@ std::map<std::string, std::string> PARSER::parseRow(const std::string& line) {
     return row;
 }
 
-nlohmann::json PARSER::parseADBOutputToJSON(const std::string& output, const std::string& rowPrefix) {
-    std::istringstream stream(output);
-    std::string line;
-
-    nlohmann::json jsonArray = nlohmann::json::array();
-
-    while (std::getline(stream, line)) {
-        if (line.find(rowPrefix) != std::string::npos) {
-            auto parsed = parseRow(line);
-
-            if (!parsed.empty()) {
-                nlohmann::json obj;
-
-                for (const auto& kv : parsed) {
-                    obj[kv.first] = kv.second;
-                }
-
-                jsonArray.push_back(obj);
-            }
-        }
-    }
-
-    return jsonArray;
-}
+//nlohmann::json PARSER::parseADBOutputToJSON(const std::string& output, const std::string& rowPrefix) {
+//    std::istringstream stream(output);
+//    std::string line;
+//
+//    nlohmann::json jsonArray = nlohmann::json::array();
+//
+//    while (std::getline(stream, line)) {
+//        if (line.find(rowPrefix) != std::string::npos) {
+//            auto parsed = parseRow(line);
+//
+//            if (!parsed.empty()) {
+//                nlohmann::json obj;
+//
+//                for (const auto& kv : parsed) {
+//                    obj[kv.first] = kv.second;
+//                }
+//
+//                jsonArray.push_back(obj);
+//            }
+//        }
+//    }
+//
+//    return jsonArray;
+//}
 
 std::vector<std::map<std::string, std::string>> PARSER::extractRows(const std::string& input) {
     std::istringstream stream(input);
@@ -195,75 +195,339 @@ nlohmann::json PARSER::parseCallLogs(const std::string& artifactRawData) {
     return result;
 }
 
-nlohmann::json PARSER::parseContacts(const std::string& artifactRawData) {
-    auto rows = extractRows(artifactRawData); // your existing row extractor
+nlohmann::json PARSER::parseADB_RAW(const std::string& artifactRawData) {
+    // Extract rows from raw artifact
+    auto rows = extractRows(artifactRawData);
     nlohmann::json result = nlohmann::json::array();
-
-    // Mapping numeric type to string
-    std::unordered_map<std::string, std::string> phoneTypeMap = {
-        {"1", "HOME"},
-        {"2", "MOBILE"},
-        {"3", "WORK"},
-        {"4", "FAX_WORK"},
-        {"5", "FAX_HOME"},
-        {"6", "PAGER"},
-        {"7", "OTHER"},
-        {"8", "CALLBACK"},
-        {"9", "CAR"},
-        {"10", "COMPANY_MAIN"},
-        {"11", "ISDN"},
-        {"12", "MAIN"},
-        {"13", "OTHER_FAX"},
-        {"14", "RADIO"},
-        {"15", "TELEX"},
-        {"16", "TTY_TDD"},
-        {"17", "WORK_MOBILE"},
-        {"18", "WORK_PAGER"},
-        {"19", "ASSISTANT"},
-        {"20", "MMS"}
-    };
-
     for (const auto& row : rows) {
         nlohmann::json obj;
-        obj["type"] = "contact";
 
-        // Name: if missing, use empty string
-        obj["name"] = row.count("display_name") && !row.at("display_name").empty()
-            ? row.at("display_name")
-            : "";
-
-        // Phone: if missing, skip the entry for forensic cleanliness
-        if (row.count("number") && !row.at("number").empty()) {
-            obj["phone"] = row.at("number");
-        }
-        else {
-            continue; // skip rows without phone numbers
+        // Simply copy every key/value in the row to JSON
+        for (const auto& [key, value] : row) {
+            obj[key] = value;
         }
 
-        // Map numeric type to string, default to OTHER
-        if (row.count("type") && !row.at("type").empty() && phoneTypeMap.count(row.at("type"))) {
-            obj["phone_type"] = phoneTypeMap[row.at("type")];
-        }
-        else {
-            obj["phone_type"] = "OTHER";
-        }
-
-        // Use contact_id if present, otherwise use person
-        if (row.count("contact_id") && !row.at("contact_id").empty()) {
-            obj["contact_id"] = row.at("contact_id");
-        }
-        else if (row.count("person") && !row.at("person").empty()) {
-            obj["contact_id"] = row.at("person");
-        }
-        else {
-            obj["contact_id"] = ""; // fallback empty
-        }
-
+        // Add this row to the array
         result.push_back(obj);
+    }
+    return result;
+}
+
+// BASIC PARSER 4: Groups all rows with the same _id (or contact_id/person) into a single JSON object. Then it interprets the mimetype of each row to organize data into structured arrays like phones, emails, addresses etc
+nlohmann::json PARSER::parseContacts(const std::string& artifactRawData) {
+    auto rows = extractRows(artifactRawData); // Your existing row extractor
+    nlohmann::json result = nlohmann::json::array();
+
+    // Map to keep track of contacts by _id
+    std::unordered_map<std::string, nlohmann::json> contactsMap;
+
+    for (const auto& row : rows) {
+        // Determine contact ID
+        std::string contactId;
+        if (row.count("contact_id") && !row.at("contact_id").empty()) contactId = row.at("contact_id");
+        else if (row.count("person") && !row.at("person").empty()) contactId = row.at("person");
+        else continue; // Skip rows without contact reference
+
+        // If contact doesn't exist yet, create base JSON object
+        if (!contactsMap.count(contactId)) {
+            nlohmann::json obj;
+            obj["_id"] = contactId;
+            obj["name"] = row.count("display_name") ? row.at("display_name") : "";
+            obj["starred"] = row.count("starred") ? row.at("starred") : "0";
+
+            obj["phones"] = nlohmann::json::array();
+            obj["emails"] = nlohmann::json::array();
+            obj["addresses"] = nlohmann::json::array();
+            obj["organizations"] = nlohmann::json::array();
+            obj["events"] = nlohmann::json::array();
+            obj["im_accounts"] = nlohmann::json::array();
+            obj["relations"] = nlohmann::json::array();
+            obj["nicknames"] = nlohmann::json::array();
+            obj["notes"] = row.count("notes") ? row.at("notes") : "";
+            obj["photos"] = nlohmann::json::array();
+
+            contactsMap[contactId] = obj;
+        }
+
+        nlohmann::json& contact = contactsMap[contactId];
+
+        // Add phone if exists
+        if (row.count("number") && !row.at("number").empty()) {
+            std::string type = row.count("type") ? row.at("type") : "0";
+            // Simple mapping, expand if needed
+            std::string typeStr = (type == "1") ? "HOME" :
+                (type == "2") ? "MOBILE" :
+                (type == "3") ? "WORK" : "OTHER";
+            contact["phones"].push_back({ {"number", row.at("number")}, {"type", typeStr} });
+        }
+
+        // Add email if exists
+        if (row.count("data1") && row.count("mimetype") && row.at("mimetype") == "vnd.android.cursor.item/email_v2") {
+            contact["emails"].push_back({ {"email", row.at("data1")}, {"type", row.count("data2") ? row.at("data2") : "OTHER"} });
+        }
+
+        // You can similarly parse addresses, organizations, events, IM accounts, etc.
+        // For brevity, I’m skipping detailed parsing here
+    }
+
+    // Move all merged contacts into the result array
+    for (auto& [_, contactJson] : contactsMap) {
+        result.push_back(contactJson);
     }
 
     return result;
 }
+
+// BASIC PARSER 3
+//nlohmann::json PARSER::parseContacts(const std::string& artifactRawData) {
+//    auto rows = extractRows(artifactRawData);
+//    nlohmann::json result = nlohmann::json::array();
+//
+//    // Helper maps for type conversion
+//    std::unordered_map<std::string, std::string> phoneTypeMap = {
+//        {"1","HOME"}, {"2","MOBILE"}, {"3","WORK"}, {"4","FAX_WORK"},
+//        {"5","FAX_HOME"}, {"6","PAGER"}, {"7","OTHER"}, {"8","CALLBACK"},
+//        {"9","CAR"}, {"10","COMPANY_MAIN"}, {"11","ISDN"}, {"12","MAIN"},
+//        {"13","OTHER_FAX"}, {"14","RADIO"}, {"15","TELEX"}, {"16","TTY_TDD"},
+//        {"17","WORK_MOBILE"}, {"18","WORK_PAGER"}, {"19","ASSISTANT"}, {"20","MMS"}
+//    };
+//
+//    for (const auto& row : rows) {
+//        nlohmann::json obj;
+//        obj["type"] = "contact";
+//        obj["_id"] = row.count("_id") ? row.at("_id") : "";
+//        obj["name"] = row.count("display_name") ? row.at("display_name") : "";
+//        obj["starred"] = row.count("starred") ? row.at("starred") : "";
+//
+//        // Phones
+//        if (row.count("number") && !row.at("number").empty()) {
+//            nlohmann::json phoneObj;
+//            phoneObj["number"] = row.at("number");
+//            phoneObj["type"] = (phoneTypeMap.count(row.at("type")) ? phoneTypeMap[row.at("type")] : "OTHER");
+//            obj["phones"] = nlohmann::json::array({ phoneObj });
+//        }
+//        else {
+//            obj["phones"] = nlohmann::json::array();
+//        }
+//
+//        // Emails
+//        if (row.count("email") && !row.at("email").empty()) {
+//            nlohmann::json emailObj;
+//            emailObj["email"] = row.at("email");
+//            emailObj["type"] = row.count("email_type") ? row.at("email_type") : "OTHER";
+//            obj["emails"] = nlohmann::json::array({ emailObj });
+//        }
+//        else {
+//            obj["emails"] = nlohmann::json::array();
+//        }
+//
+//        // Addresses
+//        nlohmann::json addresses = nlohmann::json::array();
+//        if (row.count("address_street")) {
+//            nlohmann::json addr;
+//            addr["street"] = row.at("address_street");
+//            addr["city"] = row.count("address_city") ? row.at("address_city") : "";
+//            addr["region"] = row.count("address_region") ? row.at("address_region") : "";
+//            addr["postal_code"] = row.count("address_postcode") ? row.at("address_postcode") : "";
+//            addr["country"] = row.count("address_country") ? row.at("address_country") : "";
+//            addr["type"] = row.count("address_type") ? row.at("address_type") : "OTHER";
+//            addresses.push_back(addr);
+//        }
+//        obj["addresses"] = addresses;
+//
+//        // Organizations
+//        nlohmann::json orgs = nlohmann::json::array();
+//        if (row.count("company") || row.count("title")) {
+//            nlohmann::json org;
+//            org["company"] = row.count("company") ? row.at("company") : "";
+//            org["title"] = row.count("title") ? row.at("title") : "";
+//            orgs.push_back(org);
+//        }
+//        obj["organizations"] = orgs;
+//
+//        // Events (birthday, anniversary, etc.)
+//        nlohmann::json events = nlohmann::json::array();
+//        if (row.count("event_type") && row.count("event_date")) {
+//            nlohmann::json ev;
+//            ev["type"] = row.at("event_type");
+//            ev["date"] = row.at("event_date");
+//            events.push_back(ev);
+//        }
+//        obj["events"] = events;
+//
+//        // IM accounts
+//        nlohmann::json ims = nlohmann::json::array();
+//        if (row.count("im_protocol") && row.count("im_data")) {
+//            nlohmann::json im;
+//            im["protocol"] = row.at("im_protocol");
+//            im["username"] = row.at("im_data");
+//            ims.push_back(im);
+//        }
+//        obj["im_accounts"] = ims;
+//
+//        // Relations
+//        nlohmann::json relations = nlohmann::json::array();
+//        if (row.count("relation_type") && row.count("relation_name")) {
+//            nlohmann::json rel;
+//            rel["type"] = row.at("relation_type");
+//            rel["name"] = row.at("relation_name");
+//            relations.push_back(rel);
+//        }
+//        obj["relations"] = relations;
+//
+//        // Nicknames
+//        obj["nicknames"] = row.count("nickname") ? nlohmann::json::array({ row.at("nickname") }) : nlohmann::json::array();
+//
+//        // Notes
+//        obj["notes"] = row.count("notes") ? row.at("notes") : "";
+//
+//        // Photos
+//        obj["photos"] = row.count("photo_uri") ? nlohmann::json::array({ row.at("photo_uri") }) : nlohmann::json::array();
+//
+//        result.push_back(obj);
+//    }
+//
+//    return result;
+//}
+
+// BASIC PASER 2
+//nlohmann::json PARSER::parseContacts(const std::string& artifactRawData) {
+//    auto rows = extractRows(artifactRawData);
+//    nlohmann::json result = nlohmann::json::array();
+//    std::unordered_map<std::string, nlohmann::json> contactsMap;
+//
+//    // Phone type mapping
+//    std::unordered_map<std::string, std::string> phoneTypeMap = {
+//        {"1","HOME"},{"2","MOBILE"},{"3","WORK"},{"4","FAX_WORK"},{"5","FAX_HOME"},
+//        {"6","PAGER"},{"7","OTHER"},{"8","CALLBACK"},{"9","CAR"},{"10","COMPANY_MAIN"},
+//        {"11","ISDN"},{"12","MAIN"},{"13","OTHER_FAX"},{"14","RADIO"},{"15","TELEX"},
+//        {"16","TTY_TDD"},{"17","WORK_MOBILE"},{"18","WORK_PAGER"},{"19","ASSISTANT"},{"20","MMS"}
+//    };
+//
+//    for (const auto& row : rows) {
+//        std::string contactId = row.count("contact_id") ? row.at("contact_id") :
+//            row.count("person") ? row.at("person") : "";
+//
+//        if (contactId.empty()) continue;
+//
+//        if (!contactsMap.count(contactId)) {
+//            nlohmann::json obj;
+//            obj["_id"] = contactId;
+//            obj["name"] = row.count("display_name") ? row.at("display_name") : "";
+//            obj["phones"] = nlohmann::json::array();
+//            obj["emails"] = nlohmann::json::array();
+//            obj["organization"] = nullptr;
+//            obj["notes"] = row.count("notes") ? row.at("notes") : "";
+//            obj["starred"] = row.count("starred") && row.at("starred") == "1";
+//            contactsMap[contactId] = obj;
+//        }
+//
+//        auto& obj = contactsMap[contactId];
+//
+//        // Add phone
+//        if (row.count("number") && !row.at("number").empty()) {
+//            nlohmann::json ph;
+//            ph["number"] = row.at("number");
+//            std::string t = row.count("type") ? row.at("type") : "";
+//            ph["type"] = phoneTypeMap.count(t) ? phoneTypeMap[t] : "OTHER";
+//            obj["phones"].push_back(ph);
+//        }
+//
+//        // Add email
+//        if (row.count("data1") && row.count("mimetype") && row.at("mimetype").find("email") != std::string::npos) {
+//            nlohmann::json em;
+//            em["email"] = row.at("data1");
+//            em["type"] = row.count("type") ? row.at("type") : "OTHER";
+//            obj["emails"].push_back(em);
+//        }
+//
+//        // Organization
+//        if (row.count("company") || row.count("title")) {
+//            nlohmann::json org;
+//            org["company"] = row.count("company") ? row.at("company") : "";
+//            org["title"] = row.count("title") ? row.at("title") : "";
+//            obj["organization"] = org;
+//        }
+//    }
+//
+//    // Move map values to array
+//    for (auto& [_, contact] : contactsMap) {
+//        result.push_back(contact);
+//    }
+//
+//    return result;
+//}
+
+// BASIC PASER 1
+//nlohmann::json PARSER::parseContacts(const std::string& artifactRawData) {
+//    auto rows = extractRows(artifactRawData); // your existing row extractor
+//    nlohmann::json result = nlohmann::json::array();
+//
+//    // Mapping numeric type to string
+//    std::unordered_map<std::string, std::string> phoneTypeMap = {
+//        {"1", "HOME"},
+//        {"2", "MOBILE"},
+//        {"3", "WORK"},
+//        {"4", "FAX_WORK"},
+//        {"5", "FAX_HOME"},
+//        {"6", "PAGER"},
+//        {"7", "OTHER"},
+//        {"8", "CALLBACK"},
+//        {"9", "CAR"},
+//        {"10", "COMPANY_MAIN"},
+//        {"11", "ISDN"},
+//        {"12", "MAIN"},
+//        {"13", "OTHER_FAX"},
+//        {"14", "RADIO"},
+//        {"15", "TELEX"},
+//        {"16", "TTY_TDD"},
+//        {"17", "WORK_MOBILE"},
+//        {"18", "WORK_PAGER"},
+//        {"19", "ASSISTANT"},
+//        {"20", "MMS"}
+//    };
+//
+//    for (const auto& row : rows) {
+//        nlohmann::json obj;
+//        obj["type"] = "contact";
+//
+//        // Name: if missing, use empty string
+//        obj["name"] = row.count("display_name") && !row.at("display_name").empty()
+//            ? row.at("display_name")
+//            : "";
+//
+//        // Phone: if missing, skip the entry for forensic cleanliness
+//        if (row.count("number") && !row.at("number").empty()) {
+//            obj["phone"] = row.at("number");
+//        }
+//        else {
+//            continue; // skip rows without phone numbers
+//        }
+//
+//        // Map numeric type to string, default to OTHER
+//        if (row.count("type") && !row.at("type").empty() && phoneTypeMap.count(row.at("type"))) {
+//            obj["phone_type"] = phoneTypeMap[row.at("type")];
+//        }
+//        else {
+//            obj["phone_type"] = "OTHER";
+//        }
+//
+//        // Use contact_id if present, otherwise use person
+//        if (row.count("contact_id") && !row.at("contact_id").empty()) {
+//            obj["contact_id"] = row.at("contact_id");
+//        }
+//        else if (row.count("person") && !row.at("person").empty()) {
+//            obj["contact_id"] = row.at("person");
+//        }
+//        else {
+//            obj["contact_id"] = ""; // fallback empty
+//        }
+//
+//        result.push_back(obj);
+//    }
+//
+//    return result;
+//}
 
 nlohmann::json PARSER::parseMedia(const std::string& artifactRawData) {
     auto rows = extractRows(artifactRawData);
@@ -636,6 +900,9 @@ nlohmann::json PARSER::parseArtifact(const std::string& artifactRawData, DataTyp
 
     case DataType::MEDIA:
         return parseMedia(artifactRawData);
+
+    case DataType::ADB_RAW:
+        return parseADB_RAW(artifactRawData);
 
     case DataType::CONTACTS:
         return parseContacts(artifactRawData);
