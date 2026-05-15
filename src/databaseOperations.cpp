@@ -74,9 +74,9 @@ void dbOperations::storeJsonToSQLite(SQLite::Database& db,
 
 // ===================================== PUBLIC =====================================
 
-int dbOperations::storeTablesToDbFile(std::filesystem::path pathToOutputDbFile,
-    std::vector<std::string> sqlTableNames,
-    std::vector< nlohmann::json > sqlTables) {
+int dbOperations::storeTablesToDbFile(const std::filesystem::path& pathToOutputDbFile,
+    const std::vector<std::string>& sqlTableNames,
+    const std::vector<nlohmann::json>& sqlTables) {
 
     if (sqlTableNames.size() != sqlTableNames.size()) {
         std::cerr << "Number of tables doesn't match the Number of provided table names";

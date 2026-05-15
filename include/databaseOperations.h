@@ -14,8 +14,8 @@ private:
 
 public:
 
-    static int storeTablesToDbFile(std::filesystem::path pathToOutputDbFile,
-                           std::vector<std::string> sqlTableNames,
-                           std::vector< nlohmann::json > sqlTables);
+    static int storeTablesToDbFile(const std::filesystem::path& pathToOutputDbFile,
+                           const std::vector<std::string>& sqlTableNames,
+                           const std::vector<nlohmann::json>& sqlTables);
 };
 
