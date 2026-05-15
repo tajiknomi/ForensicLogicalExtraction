@@ -5,73 +5,7 @@
 #include "parser.h"
 #include "stringUtil.h"
 #include "zipHelper.h"
-#include "SQLiteCpp/SQLiteCpp.h"
-
-
-void storeJsonToSQLite(SQLite::Database& db,
-    const std::string& tableName,
-    const nlohmann::json& jsonArray)
-{
-    if (jsonArray.empty()) {
-        std::cout << "[*] No data to insert into table: " << tableName << std::endl;
-        return;
-    }
-
-    try {
-        // 1. Determine columns from the first row
-        std::vector<std::string> columns;
-        for (auto it = jsonArray[0].begin(); it != jsonArray[0].end(); ++it) {
-            columns.push_back(it.key());
-        }
-
-        // 2. Create table if not exists (all columns as TEXT)
-        std::stringstream createTableSS;
-        createTableSS << "CREATE TABLE IF NOT EXISTS " << tableName << " (";
-        for (size_t i = 0; i < columns.size(); ++i) {
-            createTableSS << columns[i] << " TEXT";
-            if (i + 1 < columns.size()) createTableSS << ", ";
-        }
-        createTableSS << ");";
-        db.exec(createTableSS.str());
-
-        // 3. Prepare INSERT statement with placeholders
-        std::stringstream insertSS;
-        insertSS << "INSERT INTO " << tableName << " (";
-        for (size_t i = 0; i < columns.size(); ++i) {
-            insertSS << columns[i];
-            if (i + 1 < columns.size()) insertSS << ", ";
-        }
-        insertSS << ") VALUES (";
-        for (size_t i = 0; i < columns.size(); ++i) {
-            insertSS << "?";
-            if (i + 1 < columns.size()) insertSS << ", ";
-        }
-        insertSS << ");";
-
-        SQLite::Transaction transaction(db);
-
-        for (const auto& row : jsonArray) {
-            SQLite::Statement query(db, insertSS.str());
-            int idx = 1;
-            for (const auto& col : columns) {
-                if (row.contains(col)) {
-                    query.bind(idx, row.at(col).is_null() ? "" : row.at(col).get<std::string>());
-                }
-                else {
-                    query.bind(idx, "");
-                }
-                ++idx;
-            }
-            query.exec();
-        }
-
-        transaction.commit();
-        std::cout << "[+] Inserted " << jsonArray.size() << " rows into table: " << tableName << std::endl;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "SQLite Error in table '" << tableName << "': " << e.what() << std::endl;
-    }
-}
+#include "databaseOperations.h"
 
 
 
@@ -261,10 +195,17 @@ int ForensicExtractor::extractCallLogs(const std::wstring& outputFileName) {
     }
     const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
     std::cout << "[*] Extracting Call Logs...\n";
-    std::wstring output = adb.exec(L"shell content query --uri content://call_log/calls");
-    nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::CALL);
-    PARSER::saveJSONToFile(data, pathToOutputFile.string());
-    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/callLogs.zip");
+    std::wstring callLogsRAW = adb.exec(L"shell content query --uri content://call_log/calls");
+    nlohmann::json callLogs_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(callLogsRAW), DataType::ADB_RAW);
+    std::vector< nlohmann::json > sqlTables = { callLogs_json };
+    std::vector<std::string> sqlTableNames = { "CallLogs" };
+
+    if (dbOperations::storeTablesToDbFile(pathToDir / "callLogs.db", sqlTableNames, sqlTables) != 0) {
+        std::cerr << "database operation on " << pathToDir / "callLogs.db is NOT Successful" << std::endl;
+    }
+    //nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::CALL);
+    //PARSER::saveJSONToFile(data, pathToOutputFile.string());
+    //ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/callLogs.zip");
     std::cout << "[+] Call logs saved to " << pathToOutputFile << std::endl;
     return 0;
 }
@@ -366,12 +307,20 @@ int ForensicExtractor::extractMediaStoreDb(const std::wstring& outputFileName) {
     }
     const std::filesystem::path pathToOutputFile{ pathToDir.wstring() + L"\\" + outputFileName };
     std::cout << "[*] Extracting MediaStore...\n";
-    std::wstring output = adb.exec(
+    std::wstring mediaStoreDbRaw = adb.exec(
         L"shell content query --uri content://media/external/file"
     );
-    nlohmann::json data = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(output), DataType::MEDIA);
-    PARSER::saveJSONToFile(data, pathToOutputFile.string());
-    ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/MediaStore.zip");
+
+    nlohmann::json mediaStoreDb_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(mediaStoreDbRaw), DataType::ADB_RAW);
+    std::vector< nlohmann::json > sqlTables = { mediaStoreDb_json };
+    std::vector<std::string> sqlTableNames = { "MediaStore" };
+
+    if (dbOperations::storeTablesToDbFile(pathToDir / "mediaStore.db", sqlTableNames, sqlTables) != 0) {
+        std::cerr << "database operation on " << pathToDir / "MediaStore.db is NOT Successful" << std::endl;
+    }
+
+   // PARSER::saveJSONToFile(data, pathToOutputFile.string());
+  //  ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/MediaStore.zip");
     std::cout << "[+] MediaStore DB saved to " << pathToOutputFile << std::endl;
     return 0;
 }
@@ -453,18 +402,18 @@ int ForensicExtractor::extractContacts(const std::wstring& outputFileName) {
     nlohmann::json dataRaw_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(dataRaw), DataType::ADB_RAW);
     nlohmann::json contactsSim_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(contactsSim_table), DataType::ADB_RAW);
     nlohmann::json contacts_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(contacts_table), DataType::ADB_RAW);
-    SQLite::Database db(pathToDir.generic_string() + "/contacts.db", SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-    // Store each table
-    storeJsonToSQLite(db, "Contacts", contacts_json);
-    storeJsonToSQLite(db, "ContactsSim", contactsSim_json);
-    storeJsonToSQLite(db, "Data", dataRaw_json);
     
-    std::wstring phonesRaw = adb.exec(L"shell content query --uri content://contacts/phones/");
-    nlohmann::json contactsStructured_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(phonesRaw), DataType::CONTACTS);
-    PARSER::saveJSONToFile(contactsStructured_json, pathToOutputFile.string());
-  //  PARSER::saveJSONToFile(contactsRAW_json, pathToRawADBOutput.string());
-  //  ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/contacts.zip");
+    std::vector< nlohmann::json > sqlTables = { dataRaw_json , contactsSim_json, contacts_json };
+    std::vector<std::string> sqlTableNames = { "Contacts", "ContactsSim", "Data" };
+    
+    if (dbOperations::storeTablesToDbFile(pathToDir / "contacts.db", sqlTableNames, sqlTables) != 0) {
+        std::cerr << "database operation on " << pathToDir / "contacts.db is NOT Successful" << std::endl;
+    }
+    
+    //std::wstring phonesRaw = adb.exec(L"shell content query --uri content://contacts/phones/");
+    //nlohmann::json contactsStructured_json = PARSER::parseArtifact(StringUtils::convertWStringToUTF8(phonesRaw), DataType::CONTACTS);
+    //PARSER::saveJSONToFile(contactsStructured_json, pathToOutputFile.string());
+    //ZipHelper::addFileToZip(pathToOutputFile.string(), pathToDir.generic_string() + "/contacts.zip");
     std::wcout << "[+] Device CONTACTS saved to " << outputFileName << std::endl;
     return 0;
 }
