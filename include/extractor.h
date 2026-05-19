@@ -10,6 +10,15 @@ class ForensicExtractor {
 private:
     std::vector<std::tuple<std::string, std::string>> getFilePathsFromJson(const std::string& jsonFilePath);
     std::filesystem::path createDirForConnectedDevice(const std::wstring& input);
+    bool agentExistOnTarget(void);
+    bool installAgent(void);
+    bool launchAgent(void);
+    bool isAgentRunning(unsigned int& interval_sec, unsigned int& maxAttempts);
+    bool waitForAccessPermission(unsigned int& timeout_sec, unsigned int& maxAttempts);
+    bool intiateAgentExtraction(void);
+    bool pullExportedDataFromTarget(std::filesystem::path& pathToOutputDir);
+    bool deviceCleanup(void);
+
 
 private:
     ADB& adb;
