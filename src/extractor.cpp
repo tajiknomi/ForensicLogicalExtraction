@@ -1,6 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <windows.h>
+#include <cwctype>
 #include "extractor.h"
 #include "parser.h"
 #include "stringUtil.h"
@@ -93,6 +95,135 @@ int ForensicExtractor::collectCalendarRawDataViaAdb(std::wstring& calendarRawDat
 }
 
 // ===================================== PUBLIC =====================================
+
+
+int ForensicExtractor::extractAll() {
+    
+    if (this->numOfConnectedAdbDevices() == 0) {
+        std::cerr << "No device is connected !" << std::endl;
+        return -1;
+    }
+
+    std::filesystem::path pathToDir;
+    if ((pathToDir = this->createDirForConnectedDevice(adb.exec(L"devices"))).empty()) {
+        return -1;
+    }
+
+    std::wcout << L"checking existing agent on the target..." << std::endl;
+    std::wstring output = adb.exec(L"shell pm path com.example.exporter");
+    if (output.find(L"package:") != std::wstring::npos) {
+        std::wcout << L"Agent found on the target!" << std::endl;
+    }
+
+    else { // 2. Install APK    
+        std::wcout << L"Installing app..." << std::endl;
+      //  std::wstring output = adb.exec(L"install app-debug.apk");
+        output = adb.exec(L"install -r -g app-debug.apk");
+        if (output.find(L"Success") == std::wstring::npos) {
+            std::wcerr << L"Failed to install app. Output: " << output << std::endl;
+            return -1;
+        }
+        std::wcout << L"App installed successfully" << std::endl;
+    }
+    Sleep(3000);
+    // 3. Launch MainActivity to request permissions
+    std::wcout << L"Launching Agent..." << std::endl;
+    output = adb.exec(L"shell am start -n com.example.exporter/.MainActivity");
+    if (output.find(L"Error") != std::wstring::npos || output.find(L"exception") != std::wstring::npos) {
+        std::wcerr << L"Failed to launch Agent: " << output << std::endl;
+        return -1;
+    }
+
+    // 4: Check whether the agent is running or not
+    unsigned int attempts = 0;
+    bool runningSuccessFlag{ false };
+    while(attempts++ != 10){
+        output = adb.exec(L"shell pidof com.example.exporter");
+        if (!output.empty() && std::iswdigit(output[0])) {
+            std::wcout << L"Agent is running on the target with pid " << output << std::endl;
+            runningSuccessFlag = true;
+            break;
+        }
+        Sleep(500);
+    }
+
+    if (runningSuccessFlag == false) {
+        std::wcerr << L"Failed to Run Agent: " << output << std::endl;
+        return -1;
+    }
+
+    // 5. Wait for permissions (check every second for up to 10 seconds)
+    std::wcout << L"Waiting for permissions to be granted..." << std::endl;
+    bool permissionsGranted = false;
+    for (int i = 0; i < 10; i++) {
+        Sleep(1000); // Wait 1 second
+        std::wstring permCheck = adb.exec(L"shell \"appops get com.example.exporter android:read_call_log | findstr allow\"");
+        if (!permCheck.empty()) {
+            permissionsGranted = true;
+            break;
+        }
+    }
+
+    if (!permissionsGranted) {
+        std::cerr << L"Permissions not granted by user. Cannot proceed." << std::endl;
+        return -1;
+    }
+    std::wcout << L"Permissions granted successfully" << std::endl;
+
+    // 6. Export all data types
+    struct ExportTask {
+        const wchar_t* action;
+        const wchar_t* name;
+    };
+
+    ExportTask tasks[] = {
+        {L"com.exporter.DUMP_CALLS", L"Call logs"},
+        {L"com.exporter.DUMP_SMS", L"SMS"},
+        {L"com.exporter.DUMP_MMS", L"MMS"},
+        {L"com.exporter.DUMP_CONTACTS", L"Contacts"},
+        {L"com.exporter.DUMP_CALENDAR", L"Calendar"}
+    };
+
+    for (const auto& task : tasks) {
+        std::wcout << L"Exporting " << task.name << L"..." << std::endl;
+        std::wstring cmd = L"shell am start -n com.example.exporter/.ExportActivity --es action ";
+        cmd += task.action;
+        output = adb.exec(cmd);
+
+        if (output.find(L"Error") != std::wstring::npos || output.find(L"exception") != std::wstring::npos) {
+            std::wcerr << L"Failed to export " << task.name << L": " << output << std::endl;
+            // Continue with other exports instead of failing completely
+        }
+        else {
+            std::wcout << L"Successfully exported " << task.name << std::endl;
+        }
+
+        // Small delay between exports
+        Sleep(1000);
+    }
+
+    // 5. Pull all exported files
+    std::wcout << L"Pulling exported files..." << std::endl;
+    std::wstring pullCmd = L"pull /sdcard/Android/data/com.example.exporter/files/exporter/ " + pathToDir.generic_wstring();
+    output = adb.exec(pullCmd);
+
+    if (output.find(L"error") != std::wstring::npos || output.find(L"failed") != std::wstring::npos) {
+        std::wcerr << L"Failed to pull files: " << output << std::endl;
+        return -1;
+    }
+
+    std::wcout << L"Extraction complete! Files saved to: " << pathToDir << std::endl;
+
+    std::wcout << L"Cleaning up target device..." << std::endl;
+    output = adb.exec(L"uninstall com.example.exporter");
+    if (output.find(L"Success") != std::wstring::npos) {
+        std::wcout << L"Agent uninstalled successfully. Device left clean!" << std::endl;
+    }
+    else {
+        std::wcerr << L"Warning: Failed to uninstall agent cleanly." << std::endl;
+    }
+    return 0;
+}
 
 int ForensicExtractor::numOfConnectedAdbDevices() {
     

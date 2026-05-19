@@ -21,7 +21,8 @@ int main() {
         std::cin >> choice;
         switch (choice) {
         case 1:
-            extractor.showConnectedDevices(); break;
+           // extractor.showConnectedDevices(); break;
+            extractor.extractAll(); break;
 
         case 2:
             extractor.extractDeviceInfo(L"device_info.json");  break;

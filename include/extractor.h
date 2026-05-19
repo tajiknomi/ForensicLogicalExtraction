@@ -16,6 +16,7 @@ private:
 
 public:
     ForensicExtractor(ADB& adb);
+    int extractAll(void);
     int numOfConnectedAdbDevices(void);
     void showConnectedDevices(void);
     int extractDeviceInfo(const std::wstring& outputFileName);
