@@ -18,10 +18,13 @@ private:
     bool intiateAgentExtraction(void);
     bool pullExportedDataFromTarget(std::filesystem::path& pathToOutputDir);
     bool deviceCleanup(void);
+    bool hasPermissionError(const std::wstring& output);
+    int extractViaAgent(const std::wstring& artifactType);
 
 
 private:
     ADB& adb;
+    bool isAgentDumpDataAvailable{ false };
 
 public:
     ForensicExtractor(ADB& adb);

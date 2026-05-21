@@ -25,28 +25,28 @@ int main() {
             extractor.extractAll(); break;
 
         case 2:
-            extractor.extractDeviceInfo(L"device_info.json");  break;
+            extractor.extractDeviceInfo(L"deviceInfo.json");  break;
 
         case 3:
-            extractor.extractUserInstalledAppsList(L"UserInstalledAppsList.json"); break;
+            extractor.extractUserInstalledAppsList(L"appList.db"); break;
 
         case 4:
-            extractor.extractMediaStoreDb(L"mediastore.json");    break;
+            extractor.extractMediaStoreDb(L"mediastore.db");    break;
  
         case 5:
-            extractor.extractCallLogs(L"calllogs.txt"); break;     
+            extractor.extractCallLogs(L"calllogs.db"); break;     
 
         case 6:
-            extractor.extractSMS(L"sms.txt"); break;
+            extractor.extractSMS(L"sms.db"); break;
             
         case 7:
             extractor.pullMedia(L"media"); break;          
 
         case 8:
-            extractor.extractCalendarEntities(L"calendarEntities.json"); break;
+            extractor.extractCalendarEntities(L"calendarEntities.db"); break;
 
         case 9:
-            extractor.extractContacts(L"contacts.json"); break;
+            extractor.extractContacts(L"contacts.db"); break;
         
         case 0:
             std::cout << "Exiting...\n"; return 0;

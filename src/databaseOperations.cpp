@@ -4,6 +4,7 @@
 
 
 // ===================================== PRIVATE =====================================
+
 void dbOperations::storeJsonToSQLite(SQLite::Database& db,
     const std::string& tableName,
     const nlohmann::json& jsonArray)
@@ -20,7 +21,7 @@ void dbOperations::storeJsonToSQLite(SQLite::Database& db,
             columns.push_back(it.key());
         }
 
-        // 2. Create table if not exists (all columns as TEXT)
+        // 2. Create table if not exists
         std::stringstream createTableSS;
         createTableSS << "CREATE TABLE IF NOT EXISTS " << tableName << " (";
         for (size_t i = 0; i < columns.size(); ++i) {
@@ -30,7 +31,7 @@ void dbOperations::storeJsonToSQLite(SQLite::Database& db,
         createTableSS << ");";
         db.exec(createTableSS.str());
 
-        // 3. Prepare INSERT statement with placeholders
+        // 3. Prepare INSERT statement
         std::stringstream insertSS;
         insertSS << "INSERT INTO " << tableName << " (";
         for (size_t i = 0; i < columns.size(); ++i) {
@@ -50,8 +51,20 @@ void dbOperations::storeJsonToSQLite(SQLite::Database& db,
             SQLite::Statement query(db, insertSS.str());
             int idx = 1;
             for (const auto& col : columns) {
-                if (row.contains(col)) {
-                    query.bind(idx, row.at(col).is_null() ? "" : row.at(col).get<std::string>());
+                if (row.contains(col) && !row.at(col).is_null()) {
+                    const auto& val = row.at(col);
+
+                    // SAFE CONVERSION: Check internal json type before grabbing string
+                    if (val.is_string()) {
+                        query.bind(idx, val.get<std::string>());
+                    }
+                    else if (val.is_primitive()) {
+                        // Converts numbers/booleans directly to text representation safely
+                        query.bind(idx, val.dump());
+                    }
+                    else {
+                        query.bind(idx, val.dump());
+                    }
                 }
                 else {
                     query.bind(idx, "");
@@ -68,8 +81,6 @@ void dbOperations::storeJsonToSQLite(SQLite::Database& db,
         std::cerr << "SQLite Error in table '" << tableName << "': " << e.what() << std::endl;
     }
 }
-
-
 
 
 // ===================================== PUBLIC =====================================
